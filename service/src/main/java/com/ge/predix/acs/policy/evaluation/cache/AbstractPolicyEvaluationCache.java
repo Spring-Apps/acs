@@ -153,13 +153,9 @@ public abstract class AbstractPolicyEvaluationCache implements PolicyEvaluationC
     @Override
     public void resetForResource(final String zoneId, final String resourceId) {
         String timestamp = timestampValue();
-        Set<String> toKeys = getResourceTranslations(resourceTranslationKey(zoneId, resourceId));
-        Map<String, String> map = new HashMap<>();
-        for (String toKey : toKeys) {
-            map.put(toKey, timestamp);
-            logSetResourceTimestampsDebugMessage(timestamp, toKey, resourceId);
-        }
-        multiSet(map);
+        multiSet(getResourceTranslations(resourceTranslationKey(zoneId, resourceId)).stream()
+    		.map(toKey -> logSetResourceTimestampsDebugMessage(timestamp, toKey, resourceId))
+    		.collect(Collectors.toMap(toKey -> toKey, toKey -> timestamp)));
     }
 
     @Override
@@ -194,12 +190,13 @@ public abstract class AbstractPolicyEvaluationCache implements PolicyEvaluationC
         multiSet(map);
     }
 
-    private void logSetResourceTimestampsDebugMessage(final String timestamp, final String toKey,
+    private String logSetResourceTimestampsDebugMessage(final String timestamp, final String toKey,
             final String resourceId) {
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug(String.format("Setting timestamp for resource '%s'; key: '%s', value: '%s' ", resourceId,
                     toKey, timestamp));
         }
+        return toKey;
     }
 
     @Override
@@ -222,6 +219,11 @@ public abstract class AbstractPolicyEvaluationCache implements PolicyEvaluationC
     }
 
     private void multisetForSubjects(final String zoneId, final List<String> subjectIds) {
+    	
+		// subjectIds.stream().map(subjectId -> subjectKey(zoneId,
+		// subjectId)).map(key -> logSetSubjectTimestampDebugMessage(key,
+		// timestamp, subjectId));
+   	
         Map<String, String> map = new HashMap<>();
         subjectIds.forEach(subjectId -> {
             String key = subjectKey(zoneId, subjectId);
@@ -232,11 +234,13 @@ public abstract class AbstractPolicyEvaluationCache implements PolicyEvaluationC
         multiSet(map);
     }
     
-    private void logSetSubjectTimestampDebugMessage(final String key, final String timestamp, final String subjectId) {
+	private String logSetSubjectTimestampDebugMessage(final String key, final String timestamp,
+			final String subjectId) {
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug(String.format("Setting timestamp for subject '%s'; key: '%s', value: '%s' ", subjectId, key,
                     timestamp));
         }
+        return key;
     }
 
     private boolean isRequestCached(final List<String> values) {
