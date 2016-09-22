@@ -52,13 +52,13 @@ public class GraphResourceConsistencyTest {
         GraphConfig.createEdgeIndex(this.graph, GraphConfig.BY_SCOPE_INDEX_NAME, PARENT_EDGE_LABEL, SCOPE_PROPERTY_KEY);
     }
 
-    @Test(/* threadPoolSize = 2, invocationCount = 2, */ dataProvider = "resourcesForTestConcurrent",
-            successPercentage = 97)
+    @Test(dataProvider = "resourcesForTestConcurrent", successPercentage = 97)
     public void testConcurrentWriteByZoneAndResourceIdentifier(final String resourceId) {
-        System.out.println("thread_id: " + Long.toString(Thread.currentThread().getId()) + ", resource_id:" + resourceId);
+        System.out
+                .println("thread_id: " + Long.toString(Thread.currentThread().getId()) + ", resource_id:" + resourceId);
         ZoneEntity z = new ZoneEntity();
         z.setName("z1");
-        persistResourceToZoneAndAssert(z, resourceId, Collections.emptySet());
+        persistResourceAndAssertWithfindOne(z, resourceId, Collections.emptySet());
     }
 
     @DataProvider(parallel = true)
@@ -67,13 +67,31 @@ public class GraphResourceConsistencyTest {
                 .toArray(Object[][]::new);
     }
 
-    private ResourceEntity persistResourceToZoneAndAssert(final ZoneEntity zoneEntity, final String resourceIdentifier,
-            final Set<Attribute> attributes) {
+    private ResourceEntity persistResourceAndAssertWithfindOne(final ZoneEntity zoneEntity,
+            final String resourceIdentifier, final Set<Attribute> attributes) {
         ResourceEntity resource = new ResourceEntity(zoneEntity, resourceIdentifier);
         resource.setAttributes(attributes);
         resource.setAttributesAsJson(JSON_UTILS.serialize(resource.getAttributes()));
         ResourceEntity resourceEntity = this.resourceRepository.save(resource);
-        assertThat(this.resourceRepository.findOne(resourceEntity.getId()), equalTo(resource));
+        assertThat(this.resourceRepository.findOne(resource.getId()), equalTo(resource));
+        return resourceEntity;
+    }
+
+    @Test(dataProvider = "resourcesForTestConcurrent", successPercentage = 95)
+    public void testConcurrentWriteAndHierarchicalRead(final String resourceId) {
+        ZoneEntity z = new ZoneEntity();
+        z.setName("z1");
+        persistResourceAndAssertWithGetInheritedAttributes(z, resourceId, Collections.emptySet());
+    }
+
+    private ResourceEntity persistResourceAndAssertWithGetInheritedAttributes(final ZoneEntity zoneEntity,
+            final String resourceIdentifier, final Set<Attribute> attributes) {
+        ResourceEntity resource = new ResourceEntity(zoneEntity, resourceIdentifier);
+        resource.setAttributes(attributes);
+        resource.setAttributesAsJson(JSON_UTILS.serialize(resource.getAttributes()));
+        ResourceEntity resourceEntity = this.resourceRepository.save(resource);
+        assertThat(this.resourceRepository.getEntityWithInheritedAttributes(zoneEntity, resourceIdentifier, attributes),
+                equalTo(resource));
         return resourceEntity;
     }
 }
