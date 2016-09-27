@@ -1,16 +1,10 @@
 package com.ge.predix.acs.privilege.management.dao;
 
-import static com.ge.predix.acs.privilege.management.dao.GraphGenericRepository.PARENT_EDGE_LABEL;
-import static com.ge.predix.acs.privilege.management.dao.GraphGenericRepository.SCOPE_PROPERTY_KEY;
-import static com.ge.predix.acs.privilege.management.dao.GraphGenericRepository.ZONE_ID_KEY;
-import static com.ge.predix.acs.privilege.management.dao.GraphResourceRepository.RESOURCE_ID_KEY;
-import static com.ge.predix.acs.privilege.management.dao.GraphSubjectRepository.SUBJECT_ID_KEY;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 
 import java.util.Collections;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.IntStream;
 
 import org.apache.tinkerpop.gremlin.structure.Graph;
@@ -33,20 +27,9 @@ public class GraphResourceConsistencyTest {
     @BeforeClass
     public void setup() throws Exception {
         this.resourceRepository = new GraphResourceRepository();
-        setupTitanGraph();
-        this.resourceRepository.setGraph(this.graph);
-    }
-
-    private void setupTitanGraph() throws InterruptedException, ExecutionException {
         this.graph = TitanFactory.build().set("storage.backend", "inmemory").open();
-        GraphConfig.createVertexLabel(this.graph, GraphResourceRepository.RESOURCE_LABEL);
-        GraphConfig.createVertexLabel(this.graph, GraphSubjectRepository.SUBJECT_LABEL);
-        GraphConfig.createIndex(this.graph, GraphConfig.BY_ZONE_INDEX_NAME, ZONE_ID_KEY);
-        GraphConfig.createUniqueCompositeIndex(this.graph, GraphConfig.BY_ZONE_AND_RESOURCE_UNIQUE_INDEX_NAME,
-                new String[] {ZONE_ID_KEY, RESOURCE_ID_KEY});
-        GraphConfig.createUniqueCompositeIndex(this.graph, GraphConfig.BY_ZONE_AND_SUBJECT_UNIQUE_INDEX_NAME,
-                new String[] {ZONE_ID_KEY, SUBJECT_ID_KEY});
-        GraphConfig.createEdgeIndex(this.graph, GraphConfig.BY_SCOPE_INDEX_NAME, PARENT_EDGE_LABEL, SCOPE_PROPERTY_KEY);
+        GraphConfig.createSchemaElements(this.graph);
+        this.resourceRepository.setGraph(this.graph);
     }
 
     @Test(dataProvider = "resourcesForTestConcurrent", successPercentage = 97)

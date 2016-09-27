@@ -101,7 +101,7 @@ public class GraphConfig {
         return newGraph;
     }
 
-    private void createSchemaElements(final Graph newGraph) throws InterruptedException {
+    public static void createSchemaElements(final Graph newGraph) throws InterruptedException {
         createVertexLabel(newGraph, GraphResourceRepository.RESOURCE_LABEL);
         createVertexLabel(newGraph, GraphSubjectRepository.SUBJECT_LABEL);
         createVertexLabel(newGraph, GraphGenericRepository.VERSION_VERTEX_LABEL);
