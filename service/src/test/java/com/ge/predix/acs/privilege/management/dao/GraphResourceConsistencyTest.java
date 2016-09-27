@@ -23,15 +23,12 @@ import com.ge.predix.acs.model.Attribute;
 import com.ge.predix.acs.utils.JsonUtils;
 import com.ge.predix.acs.zone.management.dao.ZoneEntity;
 import com.thinkaurelius.titan.core.TitanFactory;
-import com.thinkaurelius.titan.core.TitanGraph;
 
 public class GraphResourceConsistencyTest {
     private static final JsonUtils JSON_UTILS = new JsonUtils();
 
     private GraphResourceRepository resourceRepository;
     private Graph graph;
-
-    public boolean useLocalCassandra = true;
 
     @BeforeClass
     public void setup() throws Exception {
@@ -45,17 +42,18 @@ public class GraphResourceConsistencyTest {
         GraphConfig.createVertexLabel(this.graph, GraphResourceRepository.RESOURCE_LABEL);
         GraphConfig.createVertexLabel(this.graph, GraphSubjectRepository.SUBJECT_LABEL);
         GraphConfig.createIndex(this.graph, GraphConfig.BY_ZONE_INDEX_NAME, ZONE_ID_KEY);
-        GraphConfig.createTwoKeyUniqueCompositeIndex(this.graph, GraphConfig.BY_ZONE_AND_RESOURCE_UNIQUE_INDEX_NAME,
-                ZONE_ID_KEY, RESOURCE_ID_KEY);
-        GraphConfig.createTwoKeyUniqueCompositeIndex(this.graph, GraphConfig.BY_ZONE_AND_SUBJECT_UNIQUE_INDEX_NAME,
-                ZONE_ID_KEY, SUBJECT_ID_KEY);
+        GraphConfig.createUniqueCompositeIndex(this.graph, GraphConfig.BY_ZONE_AND_RESOURCE_UNIQUE_INDEX_NAME,
+                new String[] {ZONE_ID_KEY, RESOURCE_ID_KEY});
+        GraphConfig.createUniqueCompositeIndex(this.graph, GraphConfig.BY_ZONE_AND_SUBJECT_UNIQUE_INDEX_NAME,
+                new String[] {ZONE_ID_KEY, SUBJECT_ID_KEY});
         GraphConfig.createEdgeIndex(this.graph, GraphConfig.BY_SCOPE_INDEX_NAME, PARENT_EDGE_LABEL, SCOPE_PROPERTY_KEY);
     }
 
     @Test(/* threadPoolSize = 2, invocationCount = 2, */ dataProvider = "resourcesForTestConcurrent",
             successPercentage = 97)
     public void testConcurrentWriteByZoneAndResourceIdentifier(final String resourceId) {
-        System.out.println("thread_id: " + Long.toString(Thread.currentThread().getId()) + ", resource_id:" + resourceId);
+        System.out
+                .println("thread_id: " + Long.toString(Thread.currentThread().getId()) + ", resource_id:" + resourceId);
         ZoneEntity z = new ZoneEntity();
         z.setName("z1");
         persistResourceToZoneAndAssert(z, resourceId, Collections.emptySet());

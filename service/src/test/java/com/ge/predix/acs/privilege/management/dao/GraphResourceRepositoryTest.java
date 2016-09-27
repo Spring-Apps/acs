@@ -73,10 +73,10 @@ public class GraphResourceRepositoryTest {
         GraphConfig.createVertexLabel(this.graph, GraphResourceRepository.RESOURCE_LABEL);
         GraphConfig.createVertexLabel(this.graph, GraphSubjectRepository.SUBJECT_LABEL);
         GraphConfig.createIndex(this.graph, GraphConfig.BY_ZONE_INDEX_NAME, ZONE_ID_KEY);
-        GraphConfig.createTwoKeyUniqueCompositeIndex(this.graph, GraphConfig.BY_ZONE_AND_RESOURCE_UNIQUE_INDEX_NAME,
-                ZONE_ID_KEY, RESOURCE_ID_KEY);
-        GraphConfig.createTwoKeyUniqueCompositeIndex(this.graph, GraphConfig.BY_ZONE_AND_SUBJECT_UNIQUE_INDEX_NAME,
-                ZONE_ID_KEY, SUBJECT_ID_KEY);
+        GraphConfig.createUniqueCompositeIndex(this.graph, GraphConfig.BY_ZONE_AND_RESOURCE_UNIQUE_INDEX_NAME,
+                new String[] {ZONE_ID_KEY, RESOURCE_ID_KEY});
+        GraphConfig.createUniqueCompositeIndex(this.graph, GraphConfig.BY_ZONE_AND_SUBJECT_UNIQUE_INDEX_NAME,
+                new String[] {ZONE_ID_KEY, SUBJECT_ID_KEY});
         GraphConfig.createEdgeIndex(this.graph, GraphConfig.BY_SCOPE_INDEX_NAME, PARENT_EDGE_LABEL, SCOPE_PROPERTY_KEY);
 
     }
@@ -304,7 +304,7 @@ public class GraphResourceRepositoryTest {
         assertThat(traversal.next().property(RESOURCE_ID_KEY).value(), equalTo(resourceId));
     }
     
-    @Test(expectedExceptions=IllegalArgumentException.class)
+    @Test(expectedExceptions = IllegalArgumentException.class)
     public void testSaveWithNoZoneName() {
         assertThat(IteratorUtils.count(this.graph.vertices()), equalTo(0L));
         ResourceEntity resourceEntity = new ResourceEntity();
@@ -313,7 +313,7 @@ public class GraphResourceRepositoryTest {
         this.resourceRepository.save(resourceEntity);
     }
 
-    @Test(expectedExceptions=IllegalArgumentException.class)
+    @Test(expectedExceptions = IllegalArgumentException.class)
     public void testSaveWithNoZoneEntity() {
         assertThat(IteratorUtils.count(this.graph.vertices()), equalTo(0L));
         ResourceEntity resourceEntity = new ResourceEntity();
@@ -417,7 +417,8 @@ public class GraphResourceRepositoryTest {
 
     @Test(
             expectedExceptions = AttributeLimitExceededException.class,
-            expectedExceptionsMessageRegExp = "The number of attributes on this resource .* has exceeded the maximum limit of .*")
+            expectedExceptionsMessageRegExp = "The number of attributes on this resource .* has exceeded the maximum "
+                    + "limit of .*")
     public void testSearchAttributesTraversalLimitException() {
         long traversalLimit = 256L;
         try {
@@ -505,29 +506,14 @@ public class GraphResourceRepositoryTest {
     }
 
     @Test
-    public void testGetVersionCreatesOnlyOneVertex() {
+    public void testVersion() {
         assertThat(IteratorUtils.count(this.graph.vertices()), equalTo(0L));
-        int version = this.resourceRepository.getVersion();
+        this.resourceRepository.createVersionVertex(1);
+        assertThat(this.resourceRepository.checkVersionVertexExists(1), equalTo(true));
         assertThat(IteratorUtils.count(this.graph.vertices()), equalTo(1L));
-        assertThat(version, equalTo(0));
-        version = this.resourceRepository.getVersion();
-        version = this.resourceRepository.getVersion();
-        assertThat(IteratorUtils.count(this.graph.vertices()), equalTo(1L));
-        assertThat(version, equalTo(0));
-    }
-
-    @Test
-    public void testSetVersionCreatesOnlyOneVertex() {
-        assertThat(IteratorUtils.count(this.graph.vertices()), equalTo(0L));
-        this.resourceRepository.setVersion(2);
-        int version = this.resourceRepository.getVersion();
-        assertThat(IteratorUtils.count(this.graph.vertices()), equalTo(1L));
-        assertThat(version, equalTo(2));
-        this.resourceRepository.setVersion(3);
-        this.resourceRepository.setVersion(4);
-        assertThat(IteratorUtils.count(this.graph.vertices()), equalTo(1L));
-        version = this.resourceRepository.getVersion();
-        assertThat(version, equalTo(4));
+        
+        this.resourceRepository.createVersionVertex(2);
+        assertThat(IteratorUtils.count(this.graph.vertices()), equalTo(2L));
     }
 
     public ResourceEntity persist2LevelHierarchicalResource1toZone1() {
