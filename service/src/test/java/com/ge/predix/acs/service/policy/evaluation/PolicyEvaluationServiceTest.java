@@ -54,10 +54,13 @@ import com.ge.predix.acs.model.Attribute;
 import com.ge.predix.acs.model.Effect;
 import com.ge.predix.acs.model.Policy;
 import com.ge.predix.acs.model.PolicySet;
+import com.ge.predix.acs.policy.evaluation.cache.PolicyEvaluationCacheCircuitBreaker;
+import com.ge.predix.acs.policy.evaluation.cache.PolicyEvaluationRequestCacheKey;
 import com.ge.predix.acs.privilege.management.PrivilegeManagementService;
 import com.ge.predix.acs.rest.BaseResource;
 import com.ge.predix.acs.rest.BaseSubject;
 import com.ge.predix.acs.rest.PolicyEvaluationResult;
+import com.ge.predix.acs.rest.PolicyEvaluationRequestV1;
 import com.ge.predix.acs.service.policy.admin.PolicyManagementService;
 import com.ge.predix.acs.service.policy.matcher.MatchResult;
 import com.ge.predix.acs.service.policy.matcher.PolicyMatchCandidate;
@@ -65,6 +68,8 @@ import com.ge.predix.acs.service.policy.matcher.PolicyMatcher;
 import com.ge.predix.acs.service.policy.validation.PolicySetValidator;
 import com.ge.predix.acs.service.policy.validation.PolicySetValidatorImpl;
 import com.ge.predix.acs.utils.JsonUtils;
+import com.ge.predix.acs.zone.management.dao.ZoneEntity;
+import com.ge.predix.acs.zone.resolver.ZoneResolver;
 
 /**
  * Unit tests for PolicyEvaluationService. Uses mocks, no external dependencies.
@@ -95,6 +100,10 @@ public class PolicyEvaluationServiceTest extends AbstractTestNGSpringContextTest
     private PolicyMatcher policyMatcher;
     @Mock
     private PolicyContextResolver policyScopeResolver;
+    @Mock
+    private ZoneResolver zoneResolver;
+    @Mock
+    private PolicyEvaluationCacheCircuitBreaker cache; 
     @Autowired
     private PolicySetValidator policySetValidator;
 
@@ -112,16 +121,17 @@ public class PolicyEvaluationServiceTest extends AbstractTestNGSpringContextTest
         this.evaluationService = new PolicyEvaluationServiceImpl();
         Whitebox.setInternalState(this.evaluationService, "policySetValidator", this.policySetValidator);
         MockitoAnnotations.initMocks(this);
+        when(this.zoneResolver.getZoneEntityOrFail()).thenReturn(new ZoneEntity(0L, "testzone"));
+        when(this.cache.get(any(PolicyEvaluationRequestCacheKey.class))).thenReturn(null);
     }
 
     @Test(dataProvider = "policyRequestParameterProvider", expectedExceptions = IllegalArgumentException.class)
     public void testEvaluateWithNullParameters(final String resource, final String subject, final String action) {
-        this.evaluationService.evalPolicy(resource, subject, action, EMPTY_ATTRS, EMPTY_ATTRS);
+        this.evaluationService.evalPolicy(createRequest(resource, subject, action));
     }
 
     public void testEvaluateWithNoPolicySet() {
-        PolicyEvaluationResult result = this.evaluationService.evalPolicy("resource1", "subject1", "GET", EMPTY_ATTRS,
-                EMPTY_ATTRS);
+        PolicyEvaluationResult result = this.evaluationService.evalPolicy(createRequest("resource1", "subject1", "GET"));
         Assert.assertEquals(result.getEffect(), Effect.NOT_APPLICABLE);
         Assert.assertEquals(result.getResourceAttributes().size(), 0);
         Assert.assertEquals(result.getSubjectAttributes().size(), 0);
@@ -134,8 +144,7 @@ public class PolicyEvaluationServiceTest extends AbstractTestNGSpringContextTest
         List<MatchedPolicy> matchedPolicies = Collections.emptyList();
         when(this.policyMatcher.matchForResult(any(PolicyMatchCandidate.class), anyListOf(Policy.class)))
                 .thenReturn(new MatchResult(matchedPolicies, new HashSet<String>()));
-        PolicyEvaluationResult evalPolicy = this.evaluationService.evalPolicy("resource1", "subject1", "GET",
-                EMPTY_ATTRS, EMPTY_ATTRS);
+        PolicyEvaluationResult evalPolicy = this.evaluationService.evalPolicy(createRequest("resource1", "subject1", "GET"));
         Assert.assertEquals(evalPolicy.getEffect(), Effect.NOT_APPLICABLE);
     }
 
@@ -143,8 +152,7 @@ public class PolicyEvaluationServiceTest extends AbstractTestNGSpringContextTest
     public void testEvaluateWithPolicy(final File inputPolicy, final Effect effect)
             throws JsonParseException, JsonMappingException, IOException {
         initializePolicyMock(inputPolicy);
-        PolicyEvaluationResult evalPolicy = this.evaluationService.evalPolicy("resource1", "subject1", "GET",
-                EMPTY_ATTRS, EMPTY_ATTRS);
+        PolicyEvaluationResult evalPolicy = this.evaluationService.evalPolicy(createRequest("resource1", "subject1", "GET"));
         Assert.assertEquals(evalPolicy.getEffect(), effect);
     }
 
@@ -165,8 +173,7 @@ public class PolicyEvaluationServiceTest extends AbstractTestNGSpringContextTest
         when(this.privilegeManagementService.getByResourceIdentifier(anyString())).thenReturn(this.getResource());
         when(this.privilegeManagementService.getBySubjectIdentifier(anyString()))
                 .thenReturn(this.getSubject(acsSubjectAttributeValue));
-        PolicyEvaluationResult evalPolicyResponse = this.evaluationService.evalPolicy("resource1", "subject1", "GET",
-                EMPTY_ATTRS, EMPTY_ATTRS);
+        PolicyEvaluationResult evalPolicyResponse = this.evaluationService.evalPolicy(createRequest("resource1", "subject1", "GET"));
         Assert.assertEquals(evalPolicyResponse.getEffect(), effect);
         Assert.assertTrue(evalPolicyResponse.getResourceAttributes().contains(roleAttribute));
         Assert.assertTrue(evalPolicyResponse.getResourceAttributes().contains(locationAttribute));
@@ -214,8 +221,7 @@ public class PolicyEvaluationServiceTest extends AbstractTestNGSpringContextTest
                     }
                 });
 
-        PolicyEvaluationResult result = this.evaluationService.evalPolicy("anyresource", "anysubject", "GET", EMPTY_ATTRS,
-                EMPTY_ATTRS, policySetsPriority);
+        PolicyEvaluationResult result = this.evaluationService.evalPolicy(createRequest("anyresource", "anysubject", "GET", policySetsPriority));
         Assert.assertEquals(result.getEffect(), effect);
     }
     
@@ -225,9 +231,8 @@ public class PolicyEvaluationServiceTest extends AbstractTestNGSpringContextTest
         when(this.policyService.getAllPolicySets()).thenReturn(twoPolicySets);
         when(this.policyMatcher.matchForResult(any(PolicyMatchCandidate.class), anyListOf(Policy.class)))
                 .thenThrow(new RuntimeException("This policy matcher is designed to throw an exception."));
-
-        PolicyEvaluationResult result = this.evaluationService.evalPolicy("anyresource", "anysubject", "GET", EMPTY_ATTRS,
-                EMPTY_ATTRS, Arrays.asList(twoPolicySets.get(0).getName(), twoPolicySets.get(1).getName()));
+        PolicyEvaluationResult result = this.evaluationService.evalPolicy(createRequest("anyresource", "anysubject",
+                "GET", Arrays.asList(twoPolicySets.get(0).getName(), twoPolicySets.get(1).getName())));
         Assert.assertEquals(result.getEffect(), Effect.INDETERMINATE);
     }
 
@@ -442,5 +447,23 @@ public class PolicyEvaluationServiceTest extends AbstractTestNGSpringContextTest
         Assert.assertNotNull(policySets, "Policy set files are not found or invalid");
         Assert.assertTrue(policySets.size() == 2, "One or more policy set files are not found or invalid");
         return policySets;
+    }
+
+    private PolicyEvaluationRequestV1 createRequest(final String resource, final String subject, final String action) {
+        PolicyEvaluationRequestV1 request = new PolicyEvaluationRequestV1();
+        request.setAction(action);
+        request.setSubjectIdentifier(subject);
+        request.setResourceIdentifier(resource);
+        return request;
+    }
+    
+    private PolicyEvaluationRequestV1 createRequest(final String resource, final String subject, final String action,
+            List<String> policySetsEvaluationOrder) {
+        PolicyEvaluationRequestV1 request = new PolicyEvaluationRequestV1();
+        request.setAction(action);
+        request.setSubjectIdentifier(subject);
+        request.setResourceIdentifier(resource);
+        request.setPolicySetsEvaluationOrder(policySetsEvaluationOrder);
+        return request;
     }
 }
