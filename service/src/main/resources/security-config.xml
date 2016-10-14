@@ -28,11 +28,10 @@
         http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc.xsd
         http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security.xsd
         http://www.springframework.org/schema/security/oauth2 http://www.springframework.org/schema/security/spring-security-oauth2.xsd">
+	
 
     <!-- Register Oauth AuthN Manager -->
     <sec:authentication-manager />
-	<import resource="classpath*:tasks.xml"/>
-	<!-- <import resource="claspath*:META-INF/spring/tasks.xml"/> -->
 	
     <bean
         class="org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping">
@@ -44,21 +43,6 @@
 
     <context:component-scan base-package="com.ge.predix.web.cors"/>
 
-    <!-- Correlation Log Filter -->
-    <bean id="logFilter" class="com.ge.predix.log.filter.LogFilter">
-       <constructor-arg>
-            <set value-type="java.lang.String">
-                <value>${ACS_BASE_DOMAIN}</value>
-            </set>
-        </constructor-arg>
-        <constructor-arg>
-            <set value-type="java.lang.String">
-                <value>Predix-Zone-Id</value>
-                <value>ACS-Zone-Subdomain</value>
-            </set>
-        </constructor-arg>
-        <constructor-arg value="acs" />
-    </bean>
 
     <!-- Authentication Filter -->
     <bean id="preAuthenticationEntryPoint"
@@ -191,6 +175,25 @@
     </http>
 
     <bean id="uaaTemplate" class="org.springframework.web.client.RestTemplate" />
+    
+    <import resource="classpath:META-INF/spring/tasks.xml"/>
+    
+    
+    <!-- Correlation Log Filter -->
+    <bean id="logFilter" class="com.ge.predix.log.filter.LogFilter">
+       <constructor-arg>
+            <set value-type="java.lang.String">
+                <value>${ACS_BASE_DOMAIN:localhost}</value>
+            </set>
+        </constructor-arg>
+        <constructor-arg>
+            <set value-type="java.lang.String">
+                <value>Predix-Zone-Id</value>
+                <value>ACS-Zone-Subdomain</value>
+            </set>
+        </constructor-arg>
+        <constructor-arg value="acs" />
+    </bean>
 
     <beans profile="public">
         <bean id="tokenService" class="com.ge.predix.uaa.token.lib.ZoneAwareFastTokenService">
@@ -258,4 +261,5 @@
         <!-- Nurego Metering Filter -->
         <import resource="classpath:META-INF/spring-metering-filter.xml" />
     </beans>
+    
 </beans>

@@ -46,7 +46,7 @@
 	    	<groupId>com.ge.predix</groupId>
 	        <artifactId>security-dynamic-log-configurer</artifactId>
 	        <version>1.0.0</version>
-	        <exclusions>
+	        	<exclusions>
                 <exclusion>
                     <groupId>org.slf4j</groupId>
                     <artifactId>slf4j-log4j12</artifactId>
